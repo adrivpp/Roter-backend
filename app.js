@@ -11,6 +11,7 @@ const cors = require('cors');
 require('dotenv').config();
 
 const auth = require('./routes/auth');
+const travel = require('./routes/travels')
 
 mongoose.connect(process.env.MONGODB_URI, {
   keepAlive: true,
@@ -27,7 +28,7 @@ const app = express();
 
 app.use(cors({
   credentials: true,
-  origin: [process.env.PUBLIC_DOMAIN]
+  origin: ['http://localhost:3000']
 }));
 // app.use((req, res, next) => {
 //   res.setHeader('Access-Control-Allow-Origin', 'http://localhost:3000');
@@ -57,6 +58,7 @@ app.use(cookieParser());
 app.use(express.static(path.join(__dirname, 'public')));
 
 app.use('/auth', auth);
+app.use('/travels', travel);
 
 // catch 404 and forward to error handler
 app.use((req, res, next) => {
