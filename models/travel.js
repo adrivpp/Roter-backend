@@ -5,15 +5,18 @@ const ObjectId = Schema.Types.ObjectId;
 const travelSchema = new Schema({
   owner: {
     type: ObjectId,
-    ref: 'User',
-    // required: true
+    ref: 'User',   
   },
-  name: String,
-  description: String,
+  name: String,  
   category: String,
+  seats: Number,
   activities: Array,
   date: {
     type: Date,    
+  },
+  imageUrl: {
+    type: String,
+    default: 'https://images.unsplash.com/photo-1530789253388-582c481c54b0?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=crop&w=500&q=60'
   },
   attendees: [{
     type: ObjectId,
