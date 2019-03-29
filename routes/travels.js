@@ -85,11 +85,12 @@ router.get('/:id/details', (req,res,next) => {
 })
 
 router.put('/:id/book', isLoggedIn(), (req,res,next) => { 
-  const {id} = req.params;
+  const { id } = req.params;
   const userId = req.session.currentUser._id;
   let userFound = false;  
   Travels.findById(id)
   .then((travel) => {
+    console.log(travel)
     travel.attendees.forEach((user) => {           
       if (user.equals(userId)) {        
         userFound = true;          
