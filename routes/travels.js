@@ -3,7 +3,7 @@ const router = express.Router();
 
 const Travels = require('../models/travel');
 
-const { isLoggedIn } = require('../helpers/middlewares');
+const { isLoggedIn, isOwner } = require('../helpers/middlewares');
 
 router.get('/', (req, res, next) => {
   Travels.find()
@@ -12,6 +12,27 @@ router.get('/', (req, res, next) => {
       res.json(travel)
     })
     .catch(next)
+})
+
+router.get('/owned', (req, res, next) => {  
+  const userId = req.session.currentUser._id;  
+  Travels.find({owner: userId})
+  .then((travels)=> {
+    res.json(travels)
+  })
+})
+
+router.get('/booked', (req, res, next) => {  
+  const userId = req.session.currentUser._id; 
+  Travels.find()
+  .then((travels) => {
+    if(travel.attendees.length) {
+      const filteredTravels = travels.attendees.filter((attendee => {
+        attendee.equals(userId)
+      }))
+      res.json(filteredTravels)
+    }
+  })
 })
 
 router.post('/', isLoggedIn(), (req, res, next) => {  
@@ -39,27 +60,22 @@ router.post('/', isLoggedIn(), (req, res, next) => {
 
 router.put('/:id/activities', isLoggedIn(), (req,res,next) => {
   const { id } = req.params;  
-  const { activity } = req.body;  
-  const userId = req.session.currentUser._id;  
+  const { activity } = req.body;    
   if (!activity) {
     res.json({message: 'require fields'})
     return;
-  }
-  Travels.findById(id)
-    .then((travel) => {            
-      if (travel.owner.equals(userId)) {        
-        Travels.findByIdAndUpdate(id, {$push: {activities: activity}}, {new: true})
-        .then((updatedTravel) => {
-          res.status(200);
-          res.json(updatedTravel);
-        })
-        .catch(next)
-      } else {
-        res.status(401)
-        res.json({message: 'Unauthorized'})
-      }
+  }           
+  if (isOwner(id)) {        
+    Travels.findByIdAndUpdate(id, {$push: {activities: activity}}, {new: true})
+    .then((updatedTravel) => {
+      res.status(200);
+      res.json(updatedTravel);
     })
-  .catch(next)
+    .catch(next)
+  } else {
+    res.status(401)
+    res.json({message: 'Unauthorized'})
+  }    
 })
 
 
@@ -85,12 +101,11 @@ router.get('/:id/details', (req,res,next) => {
 })
 
 router.put('/:id/book', isLoggedIn(), (req,res,next) => { 
-  const { id } = req.params;
+  const { id } = req.params;  
   const userId = req.session.currentUser._id;
   let userFound = false;  
   Travels.findById(id)
-  .then((travel) => {
-    console.log(travel)
+  .then((travel) => {   
     travel.attendees.forEach((user) => {           
       if (user.equals(userId)) {        
         userFound = true;          
@@ -138,23 +153,18 @@ router.put('/:id/unbook', isLoggedIn(), (req,res,next) => {
 })
 
 router.delete('/:id', isLoggedIn(), (req,res,next) => { 
-  const {id} = req.params;
-  const userId = req.session.currentUser._id;  
-  Travels.findById(id)
-  .then((travel) => {
-    if (travel.owner.equals(userId)) {
-      Travels.findByIdAndDelete(id)
-      .then(() => {
-        res.status(204)
-        res.json({message: 'deleted succesfully'})
-      })
-      .catch(next)
-    } else {
-      res.status(401)
-      res.json({message: 'Unauthorized'})
-    }
-  })
-  .catch(next)
+  const {id} = req.params;  
+  if (isOwner(id)) {
+    Travels.findByIdAndDelete(id)
+    .then(() => {
+      res.status(204)
+      res.json({message: 'deleted succesfully'})
+    })
+    .catch(next)
+  } else {
+    res.status(401)
+    res.json({message: 'Unauthorized'})
+  }
 })
 
 

@@ -1,3 +1,5 @@
+const Travels = require('../models/travel');
+
 exports.isLoggedIn = () => (req, res, next) => {
   if (req.session.currentUser) {
     next();
@@ -31,4 +33,15 @@ exports.validationLoggin = () => (req, res, next) => {
   } else {
     next();
   }
+}
+
+exports.isOwner = (id) =>  {
+  Travels.findById(id)
+  .then((travel) => {    
+    if (travel.owner.equals(req.session.currentUser._id)) {
+      return true
+    }
+    false
+  })
+  .catch((err) => next(err))
 }
