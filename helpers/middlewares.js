@@ -35,13 +35,3 @@ exports.validationLoggin = () => (req, res, next) => {
   }
 }
 
-exports.isOwner = (id) =>  {
-  Travels.findById(id)
-  .then((travel) => {    
-    if (travel.owner.equals(req.session.currentUser._id)) {
-      return true
-    }
-    false
-  })
-  .catch((err) => next(err))
-}

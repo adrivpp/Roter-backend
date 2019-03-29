@@ -3,7 +3,7 @@ const router = express.Router();
 
 const Travels = require('../models/travel');
 
-const { isLoggedIn, isOwner } = require('../helpers/middlewares');
+const { isLoggedIn } = require('../helpers/middlewares');
 
 router.get('/', (req, res, next) => {
   Travels.find()
@@ -60,22 +60,27 @@ router.post('/', isLoggedIn(), (req, res, next) => {
 
 router.put('/:id/activities', isLoggedIn(), (req,res,next) => {
   const { id } = req.params;  
-  const { activity } = req.body;    
+  const { activity } = req.body;  
+  const userId = req.session.currentUser._id;  
   if (!activity) {
     res.json({message: 'require fields'})
     return;
-  }           
-  if (isOwner(id)) {        
-    Travels.findByIdAndUpdate(id, {$push: {activities: activity}}, {new: true})
-    .then((updatedTravel) => {
-      res.status(200);
-      res.json(updatedTravel);
+  }
+  Travels.findById(id)
+    .then((travel) => {            
+      if (travel.owner.equals(userId)) {        
+        Travels.findByIdAndUpdate(id, {$push: {activities: activity}}, {new: true})
+        .then((updatedTravel) => {
+          res.status(200);
+          res.json(updatedTravel);
+        })
+        .catch(next)
+      } else {
+        res.status(401)
+        res.json({message: 'Unauthorized'})
+      }
     })
-    .catch(next)
-  } else {
-    res.status(401)
-    res.json({message: 'Unauthorized'})
-  }    
+  .catch(next)
 })
 
 
@@ -153,20 +158,24 @@ router.put('/:id/unbook', isLoggedIn(), (req,res,next) => {
 })
 
 router.delete('/:id', isLoggedIn(), (req,res,next) => { 
-  const {id} = req.params;  
-  if (isOwner(id)) {
-    Travels.findByIdAndDelete(id)
-    .then(() => {
-      res.status(204)
-      res.json({message: 'deleted succesfully'})
-    })
-    .catch(next)
-  } else {
-    res.status(401)
-    res.json({message: 'Unauthorized'})
-  }
+  const {id} = req.params;
+  const userId = req.session.currentUser._id;  
+  Travels.findById(id)
+  .then((travel) => {
+    if (travel.owner.equals(userId)) {
+      Travels.findByIdAndDelete(id)
+      .then(() => {
+        res.status(204)
+        res.json({message: 'deleted succesfully'})
+      })
+      .catch(next)
+    } else {
+      res.status(401)
+      res.json({message: 'Unauthorized'})
+    }
+  })
+  .catch(next)
 })
-
 
 
 module.exports = router;
