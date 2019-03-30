@@ -23,7 +23,11 @@ const travelSchema = new Schema({
     ref: 'User'
   }],
   startPoint: String,
-  endPoint: String
+  endPoint: String,
+  request: [{
+    type: ObjectId,
+    ref: 'User'
+  }]  
 });
 
 const Travels = mongoose.model('Travels', travelSchema);
