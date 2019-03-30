@@ -32,9 +32,9 @@ router.get('/booked', (req, res, next) => {
   .catch(next)
 })
 
-router.get('/notifications', (req, res, next) => {
-  const { arrayIds } = req.body;
-  Travels.find({_id: { $in: arrayIds }})
+router.post('/notifications', (req, res, next) => {
+  
+  Travels.find({_id: { $in: req.body }}).populate('request')
   .then((travel) => {
     res.status(200)
     res.json(travel)
@@ -187,8 +187,9 @@ router.put('/:id/deny', isLoggedIn(), (req,res,next) => {
       Travels.findByIdAndUpdate(id, {$pull: {request: invitedId}}, {new: true})
       .then(() => {
         User.findByIdAndUpdate(invitedId, {$push: {notifications: id}}, {new: true})
-        .then(() =>{
+        .then((user) =>{
           res.status(200)
+          res.json(user)
         })
         .catch(next)
         User.findByIdAndUpdate(travel.owner, {$pull: {notifications: id}}, {new: true})
