@@ -36,7 +36,7 @@ router.get('/booked', (req, res, next) => {
 })
 
 router.post('/', isLoggedIn(), (req, res, next) => {  
-  const { name, category, seats, date, startPoint, endPoint } = req.body;
+  const { name, category, seats, date, startPoint, endPoint, imageUrl } = req.body;
   const userId = req.session.currentUser._id;  
   if(!name || !category || !seats || !date || !startPoint || !endPoint) {
     res.json({message: 'require fields'})
@@ -49,7 +49,8 @@ router.post('/', isLoggedIn(), (req, res, next) => {
     seats,
     startPoint, 
     endPoint,
-    owner: userId
+    owner: userId, 
+    imageUrl
   })
   .then((travel) => {
     res.status(200)
