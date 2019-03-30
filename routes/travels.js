@@ -32,6 +32,16 @@ router.get('/booked', (req, res, next) => {
   .catch(next)
 })
 
+router.get('/notifications', (req, res, next) => {
+  const { arrayIds } = req.body;
+  Travels.find({_id: { $in: arrayIds }})
+  .then((travel) => {
+    res.status(200)
+    res.json(travel)
+  })
+  .catch(next)
+})
+
 router.post('/', isLoggedIn(), (req, res, next) => {  
   const { name, category, seats, date, startPoint, endPoint, imageUrl } = req.body;
   const userId = req.session.currentUser._id;  
@@ -122,12 +132,13 @@ router.put('/:id/book', isLoggedIn(), (req,res,next) => {
       .then(() => {
         User.findByIdAndUpdate(travel.owner, {$push: {notifications: id}}, {new: true})
         .then(() => {
-          res.json(200)
+          res.json(200)                    
         })
+        .catch(next)
           res.status(200);
           res.json({message:'Request sent to the ownwer'})
         })
-        .catch(next)
+      .catch(next)
       }
     })
   .catch(next)        
@@ -139,17 +150,18 @@ router.put('/:id/agree', isLoggedIn(), (req,res,next) => {
   const { invitedId } = req.body
   Travels.findById(id)
   .then((travel) => {    
-    if (travel.owner.equals(userId)) {      
-      Travels.findByIdAndUpdate(id, {$push: {attendees: invitedId}}, {$pull: {request: invitedId}}, {new: true})
-      .then(() => {
+    if (travel.owner.equals(userId)) {    
+      Travels.findByIdAndUpdate(id, { $and: [ {$push: {attendees: invitedId}}, {$pull: {request: invitedId}}]}, {new: true})
+      .then((travel) => {             
         User.findByIdAndUpdate(invitedId, {$push: {notifications: id}}, {new: true})
         .then(()=>{
           res.status(200)
         })
         .catch(next)
         User.findByIdAndUpdate(travel.owner, {$pull: {notifications: id}}, {new: true})
-        .then(() =>{
+        .then((user) =>{
           res.status(200)
+          res.json(user)
         })
         .catch(next)
         res.status(200);
@@ -159,10 +171,11 @@ router.put('/:id/agree', isLoggedIn(), (req,res,next) => {
     } else {
       res.status(401)
       res.json({message:'Unauthorized'})
-    }    
+      }    
+    })
+    .catch(next)
   })
-  .catch(next)
-})
+  
 
 router.put('/:id/deny', isLoggedIn(), (req,res,next) => { 
   const {id} = req.params;
@@ -181,6 +194,7 @@ router.put('/:id/deny', isLoggedIn(), (req,res,next) => {
         User.findByIdAndUpdate(travel.owner, {$pull: {notifications: id}}, {new: true})
         .then(() =>{
           res.status(200)
+          res.json(user)
         })
         .catch(next)
         res.status(200);
@@ -189,6 +203,7 @@ router.put('/:id/deny', isLoggedIn(), (req,res,next) => {
       .catch(next)
     } else {
       res.status(401)
+      res.json({message: 'Unauthorized'})
     }    
   })
   .catch(next)
