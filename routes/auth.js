@@ -10,6 +10,16 @@ router.get('/me', isLoggedIn(), (req, res, next) => {
   res.json(req.session.currentUser)
 });
 
+router.get('/updatedme', isLoggedIn(), (req, res, next) => { 
+  const { username } = req.session.currentUser
+  User.findOne({username}).populate('notifications')
+    .then((user) => {
+      res.status(200);
+      res.json(user);
+    })
+    .catch(next)
+})
+
 router.post('/login', isNotLoggedIn(), validationLoggin(), (req, res, next) => {
   const { username, password } = req.body;
 

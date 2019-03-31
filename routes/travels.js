@@ -119,87 +119,107 @@ router.put('/:id/book', isLoggedIn(), (req,res,next) => {
   let userFound = false;  
   Travels.findById(id)
   .then((travel) => {   
-    travel.attendees.forEach((user) => {           
-      if (user.equals(userId)) {        
-        userFound = true;          
-      } 
+    travel.request.forEach((user) => {           
+      if (user.equals(userId)) {           
+        userFound = true        
+      }        
+    })      
+      travel.attendees.forEach((attendee) => {
+        if (attendee.equals(userId)) {        
+          userFound = true
+        }
     })
+
     if (userFound) {
-      res.status(403);
-      res.json({message: 'user already booked this trip'})
+      const err = new Error('Forbbiden');
+      err.status = 403;
+      err.statusMessage = 'User already booked this trip';
+      next(err) 
     } else {          
-      Travels.findByIdAndUpdate(id, {$push: {request: userId}}, {new: true})
+      Travels.findByIdAndUpdate(id, { $push: { request: userId }}, { new: true })
       .then(() => {
-        User.findByIdAndUpdate(travel.owner, {$push: {notifications: id}}, {new: true})
+        User.findByIdAndUpdate(travel.owner, { $push: { notifications: id }}, { new: true })
         .then(() => {
-          res.json(200)                    
-        })
-        .catch(next)
-          res.status(200);
+          res.status(200)                    
           res.json({message:'Request sent to the ownwer'})
         })
+        .catch(next)          
+        })
       .catch(next)
-      }
-    })
-  .catch(next)        
-});
+    }
+  })
+  .catch(next) 
+})       
 
 router.put('/:id/agree', isLoggedIn(), (req,res,next) => { 
   const {id} = req.params;
   const userId = req.session.currentUser._id;
-  const { invitedId } = req.body
+  const { invitedId } = req.body;
+  let alreadyAttending = false;
   Travels.findById(id)
   .then((travel) => {    
-    if (travel.owner.equals(userId)) {    
-      Travels.findByIdAndUpdate(id, { $and: [ {$push: {attendees: invitedId}}, {$pull: {request: invitedId}}]}, {new: true})
-      .then((travel) => {             
-        User.findByIdAndUpdate(invitedId, {$push: {notifications: id}}, {new: true})
-        .then(()=>{
-          res.status(200)
-        })
-        .catch(next)
-        User.findByIdAndUpdate(travel.owner, {$pull: {notifications: id}}, {new: true})
-        .then((user) =>{
-          res.status(200)
-          res.json(user)
-        })
-        .catch(next)
-        res.status(200);
-        res.json({message:'succes'})
+    if (travel.attendees.length) {        
+      travel.attendees.forEach((attendee)=> {
+        if (attendee.equals(invitedId)) {   
+          alreadyAttending = true;
+          const err = new Error('Forbbiden');
+          err.status = 403;
+          err.statusMessage = 'Forbbiden';
+          next(err)    
+        } 
       })
-      .catch(next)
-    } else {
-      res.status(401)
-      res.json({message:'Unauthorized'})
-      }    
-    })
-    .catch(next)
+      return
+    }
+    if (travel.owner.equals(userId) && !alreadyAttending) {   
+        Travels.findByIdAndUpdate(id, { $push: { attendees: invitedId }}, { new: true })
+        .then(() => {   
+          Travels.findByIdAndUpdate(id, { $pull: { request: invitedId }}, { new: true })
+          .then(() => {
+            User.findByIdAndUpdate(invitedId, { $push: { notifications: id }}, { new: true })
+            .then(()=>{
+              User.findByIdAndUpdate(travel.owner, { $pull: { notifications: id }}, { new: true })
+              .then(() =>{
+                res.status(200);
+                res.json({message:'succes'})            
+              })
+              .catch(next)          
+            })
+            .catch(next)          
+          })
+          .catch(next)
+        })
+        .catch(next)
+      } else {
+        const err = new Error('Forbbiden');
+        err.status = 403;
+        err.statusMessage = 'Forbbiden';
+        next(err)
+      }        
   })
+  .catch(next)       
+})
+  
   
 
 router.put('/:id/deny', isLoggedIn(), (req,res,next) => { 
-  const {id} = req.params;
-  const userId = req.session.currentUser._id;
+  const { id } = req.params;  
+  const userId = req.session.currentUser._id;  
   const { invitedId } = req.body
   Travels.findById(id)
   .then((travel) => {    
-    if (travel.owner.equals(userId)) {      
-      Travels.findByIdAndUpdate(id, {$pull: {request: invitedId}}, {new: true})
-      .then(() => {
-        User.findByIdAndUpdate(invitedId, {$push: {notifications: id}}, {new: true})
-        .then((user) =>{
-          res.status(200)
-          res.json(user)
-        })
-        .catch(next)
-        User.findByIdAndUpdate(travel.owner, {$pull: {notifications: id}}, {new: true})
+    if (travel.owner.equals(userId)) {   
+      Travels.findByIdAndUpdate(id, { $pull: { request: invitedId }}, {new: true})
+      .then((travel) => {                   
+        User.findByIdAndUpdate(invitedId, { $push: { notifications: id }}, {new: true})      
         .then(() =>{
-          res.status(200)
-          res.json(user)
-        })
-        .catch(next)
-        res.status(200);
-        res.json({message:'Request denied'})
+          User.findByIdAndUpdate(travel.owner, { $pull: { notifications: id }}, {new: true})
+          .then(() =>{
+            res.status(200);
+            res.json({message:'Request denied'})  
+          })   
+          .catch(next)        
+        })  
+        .catch(next)      
       })
       .catch(next)
     } else {
