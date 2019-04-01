@@ -5,9 +5,9 @@ const ObjectId = Schema.Types.ObjectId;
 const userSchema = new Schema({
   username: String,
   password: String,
-  notifications: [{
+  notifications: [{    
     type: ObjectId,
-    ref: 'Travels'
+    ref: 'Travels',          
   }]  
 });
 

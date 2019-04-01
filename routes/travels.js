@@ -32,9 +32,8 @@ router.get('/booked', (req, res, next) => {
   .catch(next)
 })
 
-router.post('/notifications', (req, res, next) => {
-  
-  Travels.find({_id: { $in: req.body }}).populate('request')
+router.post('/notifications', (req, res, next) => {  
+  Travels.find({_id: { $in: req.body }}).populate('request').populate('owner')
   .then((travel) => {
     res.status(200)
     res.json(travel)
@@ -46,8 +45,10 @@ router.post('/', isLoggedIn(), (req, res, next) => {
   const { name, category, seats, date, startPoint, endPoint, imageUrl } = req.body;
   const userId = req.session.currentUser._id;  
   if(!name || !category || !seats || !date || !startPoint || !endPoint) {
-    res.json({message: 'require fields'})
-    return;
+    const err = new Error('require fields');
+    err.status = 400;
+    err.statusMessage = 'require fields';
+    next(err)  
   }
   Travels.create({
     name,
@@ -71,12 +72,14 @@ router.put('/:id/activities', isLoggedIn(), (req,res,next) => {
   const { activity } = req.body;  
   const userId = req.session.currentUser._id;  
   if (!activity) {
-    res.json({message: 'require fields'})
-    return;
+    const err = new Error('Bad request');
+    err.status = 400;
+    err.statusMessage = 'Required fields';
+    next(err)    
   }
   Travels.findById(id)
-    .then((travel) => {            
-      if (travel.owner.equals(userId)) {        
+    .then((travel) => {                 
+      if (travel.owner.equals(userId)) {    
         Travels.findByIdAndUpdate(id, {$push: {activities: activity}}, {new: true})
         .then((updatedTravel) => {
           res.status(200);
@@ -88,7 +91,7 @@ router.put('/:id/activities', isLoggedIn(), (req,res,next) => {
         res.json({message: 'Unauthorized'})
       }
     })
-  .catch(next)
+    .catch(next)
 })
 
 
@@ -180,7 +183,7 @@ router.put('/:id/agree', isLoggedIn(), (req,res,next) => {
               User.findByIdAndUpdate(travel.owner, { $pull: { notifications: id }}, { new: true })
               .then(() =>{
                 res.status(200);
-                res.json({message:'succes'})            
+                res.json({message:'request accepted'})            
               })
               .catch(next)          
             })
@@ -189,10 +192,9 @@ router.put('/:id/agree', isLoggedIn(), (req,res,next) => {
           .catch(next)
         })
         .catch(next)
-      } else {
-        const err = new Error('Forbbiden');
-        err.status = 403;
-        err.statusMessage = 'Forbbiden';
+      } else {        
+        res.status = 403;
+        res.json({message: 'Forbbiden'})
         next(err)
       }        
   })
@@ -266,7 +268,7 @@ router.delete('/:id', isLoggedIn(), (req,res,next) => {
       Travels.findByIdAndDelete(id)
       .then(() => {
         res.status(204)
-        res.json({message: 'deleted succesfully'})
+        res.json({message: 'Deleted succesfully'})
       })
       .catch(next)
     } else {

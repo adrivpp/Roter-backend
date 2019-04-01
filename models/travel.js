@@ -26,7 +26,7 @@ const travelSchema = new Schema({
   endPoint: String,
   request: [{
     type: ObjectId,
-    ref: 'User'
+    ref: 'User',    
   }]  
 });
 
