@@ -21,10 +21,12 @@ router.get('/', (req, res, next) => {
 
 router.get('/owned', (req, res, next) => {  
   const userId = req.session.currentUser._id;  
-  Travels.find({owner: userId})
+  Travels.find({owner: userId}).populate('notifications').populate('request')
   .then((travels)=> {
+    res.status(200)
     res.json(travels)
   })
+  .catch(next)
 })
 
 router.get('/booked', (req, res, next) => {  
@@ -34,17 +36,10 @@ router.get('/booked', (req, res, next) => {
     res.status(200)
     res.json(travels)
   })
-  .catch(next)
+  .catch(next)    
 })
 
-router.post('/notifications', (req, res, next) => {  
-  Travels.find({_id: { $in: req.body }}).populate('request').populate('owner')
-  .then((travel) => {
-    res.status(200)
-    res.json(travel)
-  })
-  .catch(next)
-})
+
 
 router.post('/', isLoggedIn(), (req, res, next) => {  
   const { name, category, seats, date, startPoint, endPoint, imageUrl } = req.body;
@@ -173,7 +168,7 @@ router.put('/:id/agree', isLoggedIn(), (req,res,next) => {
     const filteredNotification = travel.notifications.filter(notifiation => {
       return notifiation.request.equals(invitedId)
     })
-    Notifications.findByIdAndUpdate(filteredNotification[0]._id, { status: 'Accepted' }, {new: true})
+    Notifications.findByIdAndUpdate(filteredNotification[0]._id, { status: 'Accepted', read: true }, {new: true})
     .then(() => {
       res.status(200)
       res.json({message: 'request accepted'})
@@ -196,7 +191,7 @@ router.put('/:id/deny', isLoggedIn(), (req,res,next) => {
         return notifiation.request.equals(invitedId)
       })
       if(filteredNotification[0].status === 'Pending') {
-        Notifications.findByIdAndUpdate(filteredNotification[0]._id, { status: 'Rejected' }, {new: true})
+        Notifications.findByIdAndUpdate(filteredNotification[0]._id, { status: 'Rejected', read: true }, {new: true})
         .then(() => {
           res.status(200)
           res.json({message: 'request rejected'})
