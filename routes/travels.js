@@ -21,7 +21,7 @@ router.get('/', (req, res, next) => {
 
 router.get('/owned', (req, res, next) => {  
   const userId = req.session.currentUser._id;  
-  Travels.find({owner: userId}).populate('notifications').populate('request')
+  Travels.find({ owner: userId }).populate({ path: 'notifications', populate: {path: 'request', model: 'User'}})
   .then((travels)=> {
     res.status(200)
     res.json(travels)
@@ -36,7 +36,7 @@ router.get('/notifications', (req, res, next) => {
     const notiArray = notifications.map((notifiation) => {
       return notifiation._id
     })    
-    Travels.find({notifications: { '$in': notiArray }}).populate('notifications')
+    Travels.find({notifications: { '$in': notiArray }}).populate('notifications').populate('owner')
     .then((travels) => {
       res.status(200);
       res.json(travels)
@@ -261,6 +261,21 @@ router.put('/:id/deny', isLoggedIn(), (req,res,next) => {
 //     })
 //   .catch(next)
 // })
+
+router.put('/notifications', isLoggedIn(), (req,res,next) => { 
+  const { notification, travelId } = req.body
+  
+  Travels.findByIdAndUpdate(travelId, { $pull: { notifications: notification }}, { new: true })
+  .then((travel) => {    
+    Notifications.findByIdAndDelete(notification)
+    .then(() => {
+      res.status(200)
+      res.json(travel)
+    })
+    .catch(next)
+  })
+  .catch(next) 
+})
 
 router.delete('/:id', isLoggedIn(), (req,res,next) => { 
   const {id} = req.params;
