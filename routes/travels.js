@@ -85,15 +85,17 @@ router.put('/:id/activities', isLoggedIn(), (req,res,next) => {
   Travels.findById(id)
     .then((travel) => {                 
       if (travel.owner.equals(userId)) {    
-        Travels.findByIdAndUpdate(id, {$push: {activities: activity}}, {new: true})
+        Travels.findByIdAndUpdate(id, { $push: { activities: activity }}, { new: true })
         .then((updatedTravel) => {
           res.status(200);
           res.json(updatedTravel);
         })
         .catch(next)
       } else {
-        res.status(401)
-        res.json({message: 'Unauthorized'})
+        const err = new Error('Unauthorized');
+        err.status = 403;
+        err.statusMessage = 'Unauthorized';
+        next(err) 
       }
     })
     .catch(next)
@@ -137,16 +139,15 @@ router.post('/:id/book', isLoggedIn(), (req,res,next) => {
         next(err)  
       } else {
         Notifications.create({ request: ObjectId(userId), status: 'Pending'})
-        .then((notification) => {       
-          Travels.findByIdAndUpdate(id, { $push: { notifications: notification._id}}, {new: true})  
-          .then((travel) => {
-            console.log(travel)
-            res.status(200)
-            res.json({message: 'request sent'})
+          .then((notification) => {       
+            Travels.findByIdAndUpdate(id, { $push: { notifications: notification._id}}, {new: true})  
+            .then(() => {              
+              res.status(200)
+              res.json({message: 'request sent'})
+            })
+            .catch(next)            
           })
-          .catch(next)            
-        })
-        .catch(next)  
+          .catch(next)  
       }  
   })
   .catch(next) 
@@ -154,50 +155,32 @@ router.post('/:id/book', isLoggedIn(), (req,res,next) => {
 
 
 router.put('/:id/agree', isLoggedIn(), (req,res,next) => { 
+  // const userId = req.session.currentUser._id;
   const {id} = req.params;
-  const userId = req.session.currentUser._id;
-  const { invitedId } = req.body;
-  let alreadyAttending = false;
-  Travels.findById(id)
+  const { invitedId } = req.body;  
+  Travels.findById(id).populate('notifications')
   .then((travel) => {    
-    if (travel.attendees.length) {        
-      travel.attendees.forEach((attendee)=> {
-        if (attendee.equals(invitedId)) {   
-          alreadyAttending = true;
-          const err = new Error('Forbbiden');
-          err.status = 403;
-          err.statusMessage = 'Forbbiden';
-          next(err)    
-        } 
-      })
-      return
-    }
-    if (travel.owner.equals(userId) && !alreadyAttending) {   
-      Travels.findByIdAndUpdate(id, { $push: { attendees: invitedId }}, { new: true })        
-        .then(() => {
-          Travels.findByIdAndUpdate(id, {$pull: {request: invitedId}}, {new: true})
-          .then(() => {
-            User.findByIdAndUpdate(invitedId, { $push: { notifications: { travel: id, status: 'agreed'}  }}, { new: true })
-            .then(()=>{
-              User.findByIdAndUpdate(travel.owner, { $pull: { notifications: { travel: id }}}, { new: true })
-              .then(() =>{
-                res.status(200);
-                res.json({message:'request accepted'})            
-              })
-              .catch(next)          
-            })
-            .catch(next)          
-          })
-          .catch(next)
-        })
-        .catch(next)      
-    } else {        
-      res.status = 403;
-      res.json({message: 'Forbbiden'})
-      next(err)
-    }        
+    const alreadyAttending = travel.attendees.some((attendee) => {
+      return attendee.equals(invitedId)      
+    })
+    if (alreadyAttending) {         
+      const err = new Error('Forbbiden');
+      err.status = 403;
+      err.statusMessage = 'user already attending to this trip';
+      next(err) 
+      return   
+    }     
+    const filteredNotification = travel.notifications.filter(notifiation => {
+      return notifiation.request.equals(invitedId)
+    })
+    Notifications.findByIdAndUpdate(filteredNotification[0]._id, { status: 'Accepted' }, {new: true})
+    .then(() => {
+      res.status(200)
+      res.json({message: 'request accepted'})
+    })
+    .catch(next)     
   })
-  .catch(next)       
+  .catch(next)          
 })
   
   
@@ -206,29 +189,34 @@ router.put('/:id/deny', isLoggedIn(), (req,res,next) => {
   const { id } = req.params;  
   const userId = req.session.currentUser._id;  
   const { invitedId } = req.body
-  Travels.findById(id)
-  .then((travel) => {    
-    if (travel.owner.equals(userId)) {          
-      Travels.findByIdAndUpdate(id, {$pull: {request: invitedId}}, {new: true})
-      .then(() => {                 
-        User.findByIdAndUpdate(invitedId, { $push: { notifications: {travel: id, status: 'denied' }}}, {new: true})      
-        .then(() =>{
-          User.findByIdAndUpdate(travel.owner, { $pull: { notifications: { travel: id }}}, {new: true})
-          .then(() =>{
-            res.status(200);
-            res.json({message:'Request denied succesfully'})  
-          })   
-          .catch(next)        
-        })  
-        .catch(next) 
+  Travels.findById(id).populate('notifications')
+  .then((travel) => {   
+    if(travel.owner.equals(userId)) {
+      const filteredNotification = travel.notifications.filter(notifiation => {
+        return notifiation.request.equals(invitedId)
       })
-      .catch(next)    
+      if(filteredNotification[0].status === 'Pending') {
+        Notifications.findByIdAndUpdate(filteredNotification[0]._id, { status: 'Rejected' }, {new: true})
+        .then(() => {
+          res.status(200)
+          res.json({message: 'request rejected'})
+        })
+        .catch(next)     
+      } else {
+        const err = new Error('Forbidden');
+        err.status = 403;
+        err.statusMessage = 'Forbidden';
+        next(err) 
+      }
     } else {
-      res.status(401)
-      res.json({message: 'Unauthorized'})
-    }    
+      const err = new Error('Unauthorized');
+      err.status = 401;
+      err.statusMessage = 'Unauthorized';
+      next(err) 
+    }       
   })
-  .catch(next)
+  .catch(next)     
+
 })
 
 
