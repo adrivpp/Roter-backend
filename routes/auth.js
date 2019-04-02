@@ -7,7 +7,7 @@ const User = require('../models/user');
 const { isLoggedIn, isNotLoggedIn, validationLoggin } = require('../helpers/middlewares');
 
 router.get('/me', isLoggedIn(), (req, res, next) => {
-  res.json(req.session.currentUser)
+  res.json(req.session.currentUser)  
 });
 
 router.get('/updatedme', isLoggedIn(), (req, res, next) => { 

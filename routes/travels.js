@@ -1,7 +1,12 @@
+'use strict';
+
 const express = require('express');
 const router = express.Router();
 const User = require('../models/user');
 const Travels = require('../models/travel');
+const Notifications = require('../models/notifications');
+const mongoose = require('mongoose')
+const { ObjectId } = mongoose.Types;
 
 const { isLoggedIn } = require('../helpers/middlewares');
 
@@ -116,43 +121,37 @@ router.get('/:id/details', (req,res,next) => {
   .catch(next)
 })
 
-router.put('/:id/book', isLoggedIn(), (req,res,next) => { 
-  const { id } = req.params;  
-  const userId = req.session.currentUser._id;
-  let userFound = false;  
-  Travels.findById(id)
-  .then((travel) => {   
-    travel.request.forEach((user) => {           
-      if (user.equals(userId)) {           
-        userFound = true        
-      }        
-    })      
-      travel.attendees.forEach((attendee) => {
-        if (attendee.equals(userId)) {        
-          userFound = true
-        }
-    })
+router.post('/:id/book', isLoggedIn(), (req,res,next) => { 
+  const { id } = req.params;    
+  const userId = req.session.currentUser._id;       
 
-    if (userFound) {
-      const err = new Error('Forbbiden');
-      err.status = 403;
-      err.statusMessage = 'User already booked this trip';
-      next(err) 
-    } else {          
-      Travels.findByIdAndUpdate(id, { $push: { request: userId }}, { new: true })
-      .then(() => {
-        User.findByIdAndUpdate(travel.owner, { $push: { notifications: id }}, { new: true })
-        .then(() => {
-          res.status(200)                    
-          res.json({message:'Request sent to the ownwer'})
+  Travels.findById(id).populate('notifications')
+    .then((travel) => {
+      const isAlreadyBooked = travel.notifications.some((notification) => {
+        return notification.request.equals(userId)      
+      })
+      if (isAlreadyBooked) {
+        const err = new Error('Bad request');
+        err.status = 400;
+        err.statusMessage = 'User already booked this trip';
+        next(err)  
+      } else {
+        Notifications.create({ request: ObjectId(userId), status: 'Pending'})
+        .then((notification) => {       
+          Travels.findByIdAndUpdate(id, { $push: { notifications: notification._id}}, {new: true})  
+          .then((travel) => {
+            console.log(travel)
+            res.status(200)
+            res.json({message: 'request sent'})
+          })
+          .catch(next)            
         })
-        .catch(next)          
-        })
-      .catch(next)
-    }
+        .catch(next)  
+      }  
   })
   .catch(next) 
 })       
+
 
 router.put('/:id/agree', isLoggedIn(), (req,res,next) => { 
   const {id} = req.params;
@@ -174,13 +173,13 @@ router.put('/:id/agree', isLoggedIn(), (req,res,next) => {
       return
     }
     if (travel.owner.equals(userId) && !alreadyAttending) {   
-        Travels.findByIdAndUpdate(id, { $push: { attendees: invitedId }}, { new: true })
-        .then(() => {   
-          Travels.findByIdAndUpdate(id, { $pull: { request: invitedId }}, { new: true })
+      Travels.findByIdAndUpdate(id, { $push: { attendees: invitedId }}, { new: true })        
+        .then(() => {
+          Travels.findByIdAndUpdate(id, {$pull: {request: invitedId}}, {new: true})
           .then(() => {
-            User.findByIdAndUpdate(invitedId, { $push: { notifications: id }}, { new: true })
+            User.findByIdAndUpdate(invitedId, { $push: { notifications: { travel: id, status: 'agreed'}  }}, { new: true })
             .then(()=>{
-              User.findByIdAndUpdate(travel.owner, { $pull: { notifications: id }}, { new: true })
+              User.findByIdAndUpdate(travel.owner, { $pull: { notifications: { travel: id }}}, { new: true })
               .then(() =>{
                 res.status(200);
                 res.json({message:'request accepted'})            
@@ -191,12 +190,12 @@ router.put('/:id/agree', isLoggedIn(), (req,res,next) => {
           })
           .catch(next)
         })
-        .catch(next)
-      } else {        
-        res.status = 403;
-        res.json({message: 'Forbbiden'})
-        next(err)
-      }        
+        .catch(next)      
+    } else {        
+      res.status = 403;
+      res.json({message: 'Forbbiden'})
+      next(err)
+    }        
   })
   .catch(next)       
 })
@@ -209,21 +208,21 @@ router.put('/:id/deny', isLoggedIn(), (req,res,next) => {
   const { invitedId } = req.body
   Travels.findById(id)
   .then((travel) => {    
-    if (travel.owner.equals(userId)) {   
-      Travels.findByIdAndUpdate(id, { $pull: { request: invitedId }}, {new: true})
-      .then((travel) => {                   
-        User.findByIdAndUpdate(invitedId, { $push: { notifications: id }}, {new: true})      
+    if (travel.owner.equals(userId)) {          
+      Travels.findByIdAndUpdate(id, {$pull: {request: invitedId}}, {new: true})
+      .then(() => {                 
+        User.findByIdAndUpdate(invitedId, { $push: { notifications: {travel: id, status: 'denied' }}}, {new: true})      
         .then(() =>{
-          User.findByIdAndUpdate(travel.owner, { $pull: { notifications: id }}, {new: true})
+          User.findByIdAndUpdate(travel.owner, { $pull: { notifications: { travel: id }}}, {new: true})
           .then(() =>{
             res.status(200);
-            res.json({message:'Request denied'})  
+            res.json({message:'Request denied succesfully'})  
           })   
           .catch(next)        
         })  
-        .catch(next)      
+        .catch(next) 
       })
-      .catch(next)
+      .catch(next)    
     } else {
       res.status(401)
       res.json({message: 'Unauthorized'})
@@ -233,31 +232,31 @@ router.put('/:id/deny', isLoggedIn(), (req,res,next) => {
 })
 
 
-router.put('/:id/unbook', isLoggedIn(), (req,res,next) => { 
-  const {id} = req.params;
-  const userId = req.session.currentUser._id;
-  let userFound = false;  
-  Travels.findById(id)
-  .then((travel) => {
-    travel.attendees.forEach((user) => {           
-      if (user.equals(userId)) {        
-        userFound = true;          
-      } 
-    })
-    if(userFound) {
-      Travels.findByIdAndUpdate(id, {$pull: {attendees: userId}}, {new: true})
-      .then(() => {
-        res.status(200);
-        res.json({message: 'you are not longer attending to this trip'})
-      })
-      .catch(next)
-      } else {
-        res.status(403);
-        res.json({message: 'user has not booked this trip'})
-      }
-    })
-  .catch(next)
-})
+// router.put('/:id/unbook', isLoggedIn(), (req,res,next) => { 
+//   const {id} = req.params;
+//   const userId = req.session.currentUser._id;
+//   let userFound = false;  
+//   Travels.findById(id)
+//   .then((travel) => {
+//     travel.attendees.forEach((user) => {           
+//       if (user.equals(userId)) {        
+//         userFound = true;          
+//       } 
+//     })
+//     if(userFound) {
+//       Travels.findByIdAndUpdate(id, {$pull: {attendees: userId}}, {new: true})
+//       .then(() => {
+//         res.status(200);
+//         res.json({message: 'you are not longer attending to this trip'})
+//       })
+//       .catch(next)
+//       } else {
+//         res.status(403);
+//         res.json({message: 'user has not booked this trip'})
+//       }
+//     })
+//   .catch(next)
+// })
 
 router.delete('/:id', isLoggedIn(), (req,res,next) => { 
   const {id} = req.params;

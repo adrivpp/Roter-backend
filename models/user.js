@@ -4,11 +4,7 @@ const ObjectId = Schema.Types.ObjectId;
 
 const userSchema = new Schema({
   username: String,
-  password: String,
-  notifications: [{    
-    type: ObjectId,
-    ref: 'Travels',          
-  }]  
+  password: String,  
 });
 
 const User = mongoose.model('User', userSchema);
