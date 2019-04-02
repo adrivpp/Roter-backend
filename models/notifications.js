@@ -9,8 +9,7 @@ const notificationsSchema = new Schema({
   },
   status: {
     type: String,
-    enum: ['Accepted', 'Pending', 'Rejected'],
-    read: Boolean,
+    enum: ['Accepted', 'Pending', 'Rejected']    
   } 
 });
 
