@@ -113,18 +113,6 @@ router.put('/:id/activities', isLoggedIn(), (req,res,next) => {
     .catch(next)
 })
 
-
-// router.get('/:category', (req,res,next) => {
-//   const { category } = req.params
-//   Travels.find({category: category})
-//   .then((travel) => {
-//     console.log(travel)
-//     res.status(200)
-//     res.json(travel)   
-//   })
-//   .catch(next);  
-// }) 
-
 router.get('/:id/details', (req,res,next) => {
   const {id} = req.params;  
   Travels.findById(id).populate('notifications')
@@ -192,8 +180,12 @@ router.put('/:id/agree', isLoggedIn(), (req,res,next) => {
       .then(() => {     
         Travels.findByIdAndUpdate(id, { $push: { attendees: invitedId }}) 
         .then(() => {
-          res.status(200)
-          res.json({message: 'request accepted'})
+          Travels.findByIdAndUpdate(id, { $inc: { seats: -1 }})
+          .then(() => {
+            res.status(200)
+            res.json({message: 'request accepted'})
+          })
+          .catch(next)
         })
         .catch(next)
       })
@@ -242,31 +234,6 @@ router.put('/:id/deny', isLoggedIn(), (req,res,next) => {
 
 })
 
-// router.put('/:id/unbook', isLoggedIn(), (req,res,next) => { 
-//   const {id} = req.params;
-//   const userId = req.session.currentUser._id;
-//   let userFound = false;  
-//   Travels.findById(id)
-//   .then((travel) => {
-//     travel.attendees.forEach((user) => {           
-//       if (user.equals(userId)) {        
-//         userFound = true;          
-//       } 
-//     })
-//     if(userFound) {
-//       Travels.findByIdAndUpdate(id, {$pull: {attendees: userId}}, {new: true})
-//       .then(() => {
-//         res.status(200);
-//         res.json({message: 'you are not longer attending to this trip'})
-//       })
-//       .catch(next)
-//       } else {
-//         res.status(403);
-//         res.json({message: 'user has not booked this trip'})
-//       }
-//     })
-//   .catch(next)
-// })
 
 router.put('/notifications', isLoggedIn(), (req,res,next) => { 
   const { notification, travelId } = req.body

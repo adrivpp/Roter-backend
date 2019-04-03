@@ -1,4 +1,4 @@
-const Travels = require('../models/travel');
+
 
 exports.isLoggedIn = () => (req, res, next) => {
   if (req.session.currentUser) {
