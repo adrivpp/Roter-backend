@@ -33,10 +33,10 @@ router.get('/notifications', (req, res, next) => {
   const userId = req.session.currentUser._id;  
   Notifications.find({ request: { '$in': [userId] }})
   .then((notifications) => { 
-    const notiArray = notifications.map((notifiation) => {
+    const notificationArray = notifications.map((notifiation) => {
       return notifiation._id
     })    
-    Travels.find({notifications: { '$in': notiArray }}).populate('notifications').populate('owner')
+    Travels.find({ notifications: { '$in': notificationArray }}).populate('notifications').populate('owner')
     .then((travels) => {
       res.status(200);
       res.json(travels)
@@ -167,8 +167,8 @@ router.post('/:id/book', isLoggedIn(), (req,res,next) => {
 
 
 router.put('/:id/agree', isLoggedIn(), (req,res,next) => {   
-  const {id} = req.params;
-  const { invitedId } = req.body;  
+  const { id } = req.params;
+  const { invitedId } = req.body;    
   Travels.findById(id).populate('notifications')
   .then((travel) => {    
     const alreadyAttending = travel.attendees.some((attendee) => {
@@ -186,9 +186,13 @@ router.put('/:id/agree', isLoggedIn(), (req,res,next) => {
     })   
     if (filteredNotification[0].status === 'Pending') {
     Notifications.findByIdAndUpdate(filteredNotification[0]._id, { status: 'Accepted' }, {new: true})
-      .then(() => {      
-        res.status(200)
-        res.json({message: 'request accepted'})
+      .then(() => {     
+        Travels.findByIdAndUpdate(id, { $push: { attendees: invitedId }}) 
+        .then(() => {
+          res.status(200)
+          res.json({message: 'request accepted'})
+        })
+        .catch(next)
       })
       .catch(next)      
       } else {
@@ -234,7 +238,6 @@ router.put('/:id/deny', isLoggedIn(), (req,res,next) => {
   .catch(next)     
 
 })
-
 
 // router.put('/:id/unbook', isLoggedIn(), (req,res,next) => { 
 //   const {id} = req.params;
