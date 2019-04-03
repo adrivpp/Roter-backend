@@ -127,7 +127,7 @@ router.put('/:id/activities', isLoggedIn(), (req,res,next) => {
 
 router.get('/:id/details', (req,res,next) => {
   const {id} = req.params;  
-  Travels.findById(id)
+  Travels.findById(id).populate('notifications')
   .then((travel)=> {        
     res.status(200);
     res.json(travel)
@@ -144,10 +144,13 @@ router.post('/:id/book', isLoggedIn(), (req,res,next) => {
       const isAlreadyBooked = travel.notifications.some((notification) => {
         return notification.request.equals(userId)      
       })
-      if (isAlreadyBooked) {
+      const isAlreadyAttending = travel.attendees.some((attendee) => {
+        return attendee.equals(userId)
+      })
+      if (isAlreadyBooked || isAlreadyAttending) {
         const err = new Error('Bad request');
         err.status = 400;
-        err.statusMessage = 'User already booked this trip';
+        err.statusMessage = 'User already booked this trip or joined this trip';
         next(err)  
       } else {
         Notifications.create({ request: ObjectId(userId), status: 'Pending' })
