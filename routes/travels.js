@@ -234,7 +234,6 @@ router.put('/:id/deny', isLoggedIn(), (req,res,next) => {
 
 })
 
-
 router.put('/notifications', isLoggedIn(), (req,res,next) => { 
   const { notification, travelId } = req.body
   
